@@ -17,7 +17,7 @@ local CurrentSettings = {
 	["SelectType"] = 1,
 }
 
-local MinDistance = 4
+local MinDistance = 3
 local MaxForce = Vector3.new(math.huge, math.huge, math.huge)
 local SelectionColor = Color3.fromRGB(0, 170, 255)
 
@@ -36,8 +36,7 @@ for SettingName, SettingValue in pairs(CurrentSettings) do
 end
 
 local BodyPosition = Instance.new("BodyPosition")
-BodyPosition.maxForce = MaxForce
-BodyPosition.P = BodyPosition.P * 1.1
+BodyPosition.MaxForce = MaxForce
 
 local SelectionBox = Instance.new("SelectionBox")
 SelectionBox.Color3 = SelectionColor
@@ -49,7 +48,7 @@ local RaycastParams = RaycastParams.new()
 RaycastParams.FilterType = Enum.RaycastFilterType.Exclude
 RaycastParams.IgnoreWater = true
 RaycastParams.RespectCanCollide = false
-RaycastParams.FilterDescendantsInstances = {Tool, LocalPlayer.Character}
+RaycastParams.FilterDescendantsInstances = {Tool}
 
 local function PerformRaycast()
 	if LocalPlayer.Character then
@@ -58,9 +57,9 @@ local function PerformRaycast()
 		RaycastParams.FilterDescendantsInstances = {Tool}
 	end
 
-	local mouseLocation = UserInputService:GetMouseLocation()
-	local ray = Camera:ViewportPointToRay(mouseLocation.X, mouseLocation.Y)
-	local RaycastResult = workspace:Raycast(ray.Origin, ray.Direction * 1000, RaycastParams)
+	local MouseLocation = UserInputService:GetMouseLocation()
+	local CameraRay = Camera:ViewportPointToRay(MouseLocation.X, MouseLocation.Y)
+	local RaycastResult = workspace:Raycast(CameraRay.Origin, CameraRay.Direction * 2048, RaycastParams)
 	return RaycastResult
 end
 
@@ -138,7 +137,6 @@ local function CreateGui()
 	RotateKeySetting.TextColor = BrickColor.new("Institutional white")
 	RotateKeySetting.TextColor3 = Color3.fromRGB(255, 255, 255)
 	RotateKeySetting.TextScaled = true
-	RotateKeySetting.TextWrap = true
 	RotateKeySetting.TextWrapped = true
 	RotateKeySetting.TextXAlignment = Enum.TextXAlignment.Left
 	RotateKeySetting.AutoButtonColor = false
@@ -165,7 +163,6 @@ local function CreateGui()
 	ThrowKeySetting.TextColor = BrickColor.new("Institutional white")
 	ThrowKeySetting.TextColor3 = Color3.fromRGB(255, 255, 255)
 	ThrowKeySetting.TextScaled = true
-	ThrowKeySetting.TextWrap = true
 	ThrowKeySetting.TextWrapped = true
 	ThrowKeySetting.TextXAlignment = Enum.TextXAlignment.Left
 	ThrowKeySetting.AutoButtonColor = false
@@ -193,7 +190,6 @@ local function CreateGui()
 	CloserKeySetting.TextColor = BrickColor.new("Institutional white")
 	CloserKeySetting.TextColor3 = Color3.fromRGB(255, 255, 255)
 	CloserKeySetting.TextScaled = true
-	CloserKeySetting.TextWrap = true
 	CloserKeySetting.TextWrapped = true
 	CloserKeySetting.TextXAlignment = Enum.TextXAlignment.Left
 	CloserKeySetting.AutoButtonColor = false
@@ -221,7 +217,6 @@ local function CreateGui()
 	FartherAwayKeySetting.TextColor = BrickColor.new("Institutional white")
 	FartherAwayKeySetting.TextColor3 = Color3.fromRGB(255, 255, 255)
 	FartherAwayKeySetting.TextScaled = true
-	FartherAwayKeySetting.TextWrap = true
 	FartherAwayKeySetting.TextWrapped = true
 	FartherAwayKeySetting.TextXAlignment = Enum.TextXAlignment.Left
 	FartherAwayKeySetting.AutoButtonColor = false
@@ -249,7 +244,6 @@ local function CreateGui()
 	SelectTypeSetting.TextColor = BrickColor.new("Institutional white")
 	SelectTypeSetting.TextColor3 = Color3.fromRGB(255, 255, 255)
 	SelectTypeSetting.TextScaled = true
-	SelectTypeSetting.TextWrap = true
 	SelectTypeSetting.TextWrapped = true
 	SelectTypeSetting.TextXAlignment = Enum.TextXAlignment.Left
 	SelectTypeSetting.AutoButtonColor = false
@@ -271,13 +265,11 @@ local function CreateGui()
 
 	local SettingsButton = Instance.new("TextButton")
 	SettingsButton.FontFace = Font.new("rbxasset://fonts/families/Roboto.json", Enum.FontWeight.Regular, Enum.FontStyle.Italic)
-	SettingsButton.FontSize = Enum.FontSize.Size14
 	SettingsButton.Text = "Settings"
 	SettingsButton.TextColor = BrickColor.new("Institutional white")
 	SettingsButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 	SettingsButton.TextScaled = true
 	SettingsButton.TextSize = 14
-	SettingsButton.TextWrap = true
 	SettingsButton.TextWrapped = true
 	SettingsButton.AutoButtonColor = false
 	SettingsButton.AnchorPoint = Vector2.new(1, 1)
@@ -298,13 +290,11 @@ local function CreateGui()
 
 	local PickUpButton = Instance.new("TextButton")
 	PickUpButton.FontFace = Font.new("rbxasset://fonts/families/Roboto.json", Enum.FontWeight.Regular, Enum.FontStyle.Italic)
-	PickUpButton.FontSize = Enum.FontSize.Size14
 	PickUpButton.Text = "Pick Up"
 	PickUpButton.TextColor = BrickColor.new("Institutional white")
 	PickUpButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 	PickUpButton.TextScaled = true
 	PickUpButton.TextSize = 14
-	PickUpButton.TextWrap = true
 	PickUpButton.TextWrapped = true
 	PickUpButton.AutoButtonColor = false
 	PickUpButton.AnchorPoint = Vector2.new(1, 1)
@@ -506,6 +496,7 @@ UserInputService.InputBegan:Connect(function(Input, Processed)
 				RemoveBodyGyro(SelectedObject)
 				local BodyGyro = Instance.new("BodyGyro")
 				BodyGyro.MaxTorque = Vector3.new(math.huge, 0, math.huge)
+				BodyGyro.D = 100
 				BodyGyro.CFrame = CFrame.new(SelectedObject.CFrame.Position)
 				BodyGyro.Parent = SelectedObject
 			end
