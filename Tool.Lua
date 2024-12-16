@@ -20,12 +20,16 @@ local CurrentSettings = {
 local MinDistance = 3
 local MaxForce = Vector3.new(math.huge, math.huge, math.huge)
 local SelectionColor = Color3.fromRGB(0, 170, 255)
-
 local SelectedObject = nil
 local IsMouseDown = false
 local GrabDistance = nil
 local IsScriptActive = true
 local IsObjectSelected = false
+local PendingObject = nil
+local TextButton = nil
+local MaxDistance = 10000
+local Connections = {}
+local CurrentSelectionBox = nil
 
 for SettingName, SettingValue in pairs(CurrentSettings) do
 	if not ReplicatedStorage:GetAttribute(SettingName) then
@@ -38,28 +42,34 @@ end
 local BodyPosition = Instance.new("BodyPosition")
 BodyPosition.MaxForce = MaxForce
 
-local SelectionBox = Instance.new("SelectionBox")
-SelectionBox.Color3 = SelectionColor
-SelectionBox.LineThickness = 0.05
-SelectionBox.SurfaceTransparency = 0.7
-SelectionBox.SurfaceColor3 = SelectionColor
-
 local RaycastParams = RaycastParams.new()
 RaycastParams.FilterType = Enum.RaycastFilterType.Exclude
 RaycastParams.IgnoreWater = true
 RaycastParams.RespectCanCollide = false
 RaycastParams.FilterDescendantsInstances = {Tool}
 
-local function PerformRaycast()
+local function UpdateRaycastParams()
+	local FilterInstances = {Tool}
+
 	if LocalPlayer.Character then
-		RaycastParams.FilterDescendantsInstances = {Tool, LocalPlayer.Character}
-	else
-		RaycastParams.FilterDescendantsInstances = {Tool}
+		table.insert(FilterInstances, LocalPlayer.Character)
 	end
+
+	for _, Player in pairs(PlayerService:GetPlayers()) do
+		if Player ~= LocalPlayer and Player.Character then
+			table.insert(FilterInstances, Player.Character)
+		end
+	end
+
+	RaycastParams.FilterDescendantsInstances = FilterInstances
+end
+
+local function PerformRaycast()
 
 	local MouseLocation = UserInputService:GetMouseLocation()
 	local CameraRay = Camera:ViewportPointToRay(MouseLocation.X, MouseLocation.Y)
 	local RaycastResult = workspace:Raycast(CameraRay.Origin, CameraRay.Direction * 2048, RaycastParams)
+
 	return RaycastResult
 end
 
@@ -100,6 +110,17 @@ local function KeyButton(SettingName, Button, DisplayText)
 	end)
 end
 
+local function CreateSelectionBox()
+	local SelectionBox = Instance.new("SelectionBox")
+	SelectionBox.Parent = game:GetService("Workspace")
+	SelectionBox.Color3 = SelectionColor
+	SelectionBox.LineThickness = 0.05
+	SelectionBox.SurfaceTransparency = 0.7
+	SelectionBox.SurfaceColor3 = SelectionColor
+
+	return SelectionBox
+end
+
 local function CreateGui()
 	local PlayerGui = LocalPlayer:FindFirstChild("PlayerGui")
 	if not PlayerGui then return nil end
@@ -132,7 +153,7 @@ local function CreateGui()
 	UIListLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 
 	local StabilizeKeySetting = Instance.new("TextButton")
-	StabilizeKeySetting.FontFace = Font.new("rbxasset://fonts/families/Roboto.json", Enum.FontWeight.Regular, Enum.FontStyle.Italic)
+	StabilizeKeySetting.FontFace = Font.new("rbxasset://fonts/families/Rooboto.json", Enum.FontWeight.Regular, Enum.FontStyle.Italic)
 	StabilizeKeySetting.Text = ""
 	StabilizeKeySetting.TextColor = BrickColor.new("Institutional white")
 	StabilizeKeySetting.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -241,11 +262,11 @@ local function CreateGui()
 	local SelectTypeSetting = Instance.new("TextButton")
 	SelectTypeSetting.FontFace = Font.new("rbxasset://fonts/families/Roboto.json", Enum.FontWeight.Regular, Enum.FontStyle.Italic)
 	SelectTypeSetting.Text = "Select Type : Hold"
-	
+
 	if CurrentSettings["SelectType"] == 2 then
 		SelectTypeSetting.Text = "Select Type : Click Select / Unselect"
 	end
-	
+
 	if CurrentSettings["SelectType"] == 3 then
 		SelectTypeSetting.Text = "Select Type : Button"
 	end
@@ -314,7 +335,7 @@ local function CreateGui()
 	PickUpButton.Position = UDim2.new(0.88, 0, 0.98, 0)
 	PickUpButton.Size = UDim2.new(0.22, 0, 0.08, 0)
 	PickUpButton.Name = "PickUpButton"
-	
+
 	if CurrentSettings["SelectType"] == 3 then
 		PickUpButton.Visible = true
 	else
@@ -377,17 +398,21 @@ end
 
 local function UpdateSelectionHighlight(Object)
 	if Object then
-		SelectionBox.Adornee = Object
-		SelectionBox.Parent = Object
+		if not CurrentSelectionBox  or not CurrentSelectionBox:IsDescendantOf(game) then
+			CurrentSelectionBox = CreateSelectionBox()
+		end
+		CurrentSelectionBox.Parent = Object
+		CurrentSelectionBox.Adornee = Object
 	else
-		SelectionBox.Adornee = nil
-		SelectionBox.Parent = nil
+		if CurrentSelectionBox then
+			CurrentSelectionBox:Destroy()
+		end
 	end
 end
 
-local function RemoveBodyGyro(object)
-	if object then
-		for _, Child in ipairs(object:GetChildren()) do
+local function RemoveBodyGyro(Object)
+	if Object and Object:IsDescendantOf(game) then
+		for _, Child in ipairs(Object:GetChildren()) do
 			if Child:IsA("BodyGyro") then
 				Child:Destroy()
 			end
@@ -395,18 +420,18 @@ local function RemoveBodyGyro(object)
 	end
 end
 
-local PendingObject = nil
-local TextButton = nil
-
 local function CleanupObject()
 	if SelectedObject then
-		BodyPosition.Parent = nil
-		RemoveBodyGyro(SelectedObject)
+		if SelectedObject:IsDescendantOf(game) then
+			BodyPosition.Parent = nil
+			RemoveBodyGyro(SelectedObject)
+		end
 		SelectedObject = nil
 		IsObjectSelected = false
 		PendingObject = nil
-		SelectionBox.Adornee = nil
-		SelectionBox.Parent = nil
+		if CurrentSelectionBox then
+			CurrentSelectionBox:Destroy()
+		end
 		if TextButton then
 			TextButton.Text = "Pick Up"
 		end
@@ -416,23 +441,35 @@ end
 local function GetToolPosition()
 	local Character = LocalPlayer.Character
 
-	if Character then
-		local ToolCFrame = Character:GetPivot() * CFrame.new(0, 1, 0)
-		return ToolCFrame.Position
+	if not Character then
+		if Camera then
+			return Camera.CFrame.Position
+		else
+			return Vector3.zero
+		end
 	end
-
-	return Vector3.new(0,0,0)
+	
+	local ToolCFrame = Character:GetPivot() * CFrame.new(0, 1, 0)
+	return ToolCFrame.Position
 end
 
 local function HandleObjectMovement()
-	if not SelectedObject or not SelectedObject.Parent then return end
+	if not SelectedObject or not SelectedObject:IsDescendantOf(game) then 
+		CleanupObject()
+		return 
+	end
 
 	local MouseHitPos = GetMouseHitPosition()
 	local ToolPosition = GetToolPosition()
+
+	if not MouseHitPos or not ToolPosition then return end
+
 	local AimCFrame = CFrame.new(ToolPosition, MouseHitPos)
 
+	if not BodyPosition or not BodyPosition.Parent then return end
+
 	BodyPosition.Parent = SelectedObject
-	BodyPosition.Position = ToolPosition + AimCFrame.LookVector * GrabDistance
+	BodyPosition.Position = ToolPosition + AimCFrame.LookVector * math.min(GrabDistance or 10, MaxDistance)
 end
 
 local function GetGrabDistance()
@@ -537,11 +574,13 @@ UserInputService.InputEnded:Connect(function(Input, Processed)
 	end
 end)
 
-game:GetService("RunService").RenderStepped:Connect(function()
+local RunServiceConnection = game:GetService("RunService").RenderStepped:Connect(function()
 	if SelectedObject and IsScriptActive then
 		HandleObjectMovement()
 	end
 end)
+
+table.insert(Connections, RunServiceConnection)
 
 Tool.Destroying:Connect(function()
 	if Gui then
@@ -549,9 +588,17 @@ Tool.Destroying:Connect(function()
 		Gui = nil
 	end
 
+	for _, Connection in ipairs(Connections) do
+		Connection:Disconnect()
+	end
+
+	table.clear(Connections)
+
 	IsScriptActive = false
 	CleanupObject()
-	SelectionBox:Destroy()
+	if CurrentSelectionBox then
+		CurrentSelectionBox:Destroy()
+	end
 	BodyPosition:Destroy()
 end)
 
@@ -577,6 +624,8 @@ Tool.Equipped:Connect(function()
 	if TextButton then
 		TextButton.MouseButton1Click:Connect(HandleTextButtonClick)
 	end
+
+	UpdateRaycastParams()
 end)
 
 Tool.Unequipped:Connect(function()
@@ -585,6 +634,27 @@ Tool.Unequipped:Connect(function()
 	if not Gui then
 		return
 	end
+
 	Gui:Destroy()
 	Gui = nil
+
+	if CurrentSelectionBox then
+		CurrentSelectionBox:Destroy()
+	end
+end)
+
+PlayerService.PlayerAdded:Connect(function(Player)
+	Player.CharacterAdded:Connect(function()
+		if not IsScriptActive then
+			return
+		end
+		UpdateRaycastParams()
+	end)
+end)
+
+PlayerService.PlayerRemoving:Connect(function(Player)
+	if not IsScriptActive then
+		return
+	end
+	UpdateRaycastParams()
 end)
