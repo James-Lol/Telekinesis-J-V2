@@ -22,7 +22,7 @@ Button.BorderColor = BrickColor.new("Really black")
 Button.BorderColor3 = Color3.fromRGB(0, 0, 0)
 Button.BorderSizePixel = 0
 Button.Position = UDim2.new(0.01, 0, 0.98, 0)
-Button.Size = UDim2.new(0.06, 0, 0.11, 0)
+Button.Size = UDim2.new(0.03, 0, 0.6, 0)
 Button.Name = "Button"
 
 local UIAspectRatioConstraint = Instance.new("UIAspectRatioConstraint")
