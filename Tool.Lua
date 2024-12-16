@@ -402,10 +402,11 @@ local function CleanupObject()
 	if SelectedObject then
 		BodyPosition.Parent = nil
 		RemoveBodyGyro(SelectedObject)
-		UpdateSelectionHighlight(nil)
 		SelectedObject = nil
 		IsObjectSelected = false
 		PendingObject = nil
+		SelectionBox.Adornee = nil
+		SelectionBox.Parent = nil
 		if TextButton then
 			TextButton.Text = "Pick Up"
 		end
