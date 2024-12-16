@@ -399,14 +399,20 @@ end
 local function UpdateSelectionHighlight(Object)
 	if Object then
 		if CurrentSelectionBox then
-			CurrentSelectionBox:Destroy()
+			CurrentSelectionBox.Adornee = nil
+			CurrentSelectionBox.Parent = nil
+		else
+			CurrentSelectionBox = CreateSelectionBox()
 		end
-		CurrentSelectionBox = CreateSelectionBox()
-		CurrentSelectionBox.Parent = Object
+
+		CurrentSelectionBox.Parent = game:GetService("Workspace")
 		CurrentSelectionBox.Adornee = Object
 	else
 		if CurrentSelectionBox then
+			CurrentSelectionBox.Adornee = nil
+			CurrentSelectionBox.Parent = nil
 			CurrentSelectionBox:Destroy()
+			CurrentSelectionBox = nil
 		end
 	end
 end
@@ -598,7 +604,10 @@ Tool.Destroying:Connect(function()
 	IsScriptActive = false
 	CleanupObject()
 	if CurrentSelectionBox then
+		CurrentSelectionBox.Adornee = nil
+		CurrentSelectionBox.Parent = nil
 		CurrentSelectionBox:Destroy()
+		CurrentSelectionBox = nil
 	end
 	BodyPosition:Destroy()
 end)
@@ -640,7 +649,10 @@ Tool.Unequipped:Connect(function()
 	Gui = nil
 
 	if CurrentSelectionBox then
+		CurrentSelectionBox.Adornee = nil
+		CurrentSelectionBox.Parent = nil
 		CurrentSelectionBox:Destroy()
+		CurrentSelectionBox = nil
 	end
 end)
 
