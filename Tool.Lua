@@ -1,8 +1,11 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local PlayerService = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+
 local LocalPlayer = PlayerService.LocalPlayer
-local Camera = game:GetService("Workspace").CurrentCamera
+local Camera = Workspace.CurrentCamera
 
 local Tool = Instance.new("Tool")
 Tool.RequiresHandle = false
@@ -13,24 +16,8 @@ local CurrentSettings = {
 	["CloserKey"] = Enum.KeyCode.Q,
 	["FartherAwayKey"] = Enum.KeyCode.E,
 	["StabilizeKey"] = Enum.KeyCode.R,
-	["ThrowKey"] = Enum.KeyCode.Z,
-	["SelectType"] = 1,
+	["ThrowKey"] = Enum.KeyCode.Y
 }
-
-local MinDistance = 3
-local MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-local SelectionColor = Color3.fromRGB(0, 170, 255)
-local SelectedObject = nil
-local IsMouseDown = false
-local GrabDistance = nil
-local IsScriptActive = true
-local IsObjectSelected = false
-local PendingObject = nil
-local TextButton = nil
-local MaxDistance = 10000
-local Connections = {}
-local ToolEquipped = false
-local CurrentSelectionBox = nil
 
 for SettingName, SettingValue in pairs(CurrentSettings) do
 	if not ReplicatedStorage:GetAttribute(SettingName) then
@@ -40,16 +27,58 @@ for SettingName, SettingValue in pairs(CurrentSettings) do
 	end
 end
 
-local BodyPosition = Instance.new("BodyPosition")
-BodyPosition.MaxForce = MaxForce
+local SelectedObjects = {}
+local ToolEquipped = false
 
-local RaycastParams = RaycastParams.new()
-RaycastParams.FilterType = Enum.RaycastFilterType.Exclude
-RaycastParams.IgnoreWater = true
-RaycastParams.RespectCanCollide = false
-RaycastParams.FilterDescendantsInstances = {Tool}
+local function GetToolPosition()
+	local Character = LocalPlayer.Character
+	if not Character then return Camera.CFrame.Position end
 
-local function UpdateRaycastParams()
+	local HumanoidRootPart = Character:FindFirstChild("HumanoidRootPart")
+	if not HumanoidRootPart then return Camera.CFrame.Position end
+
+	return HumanoidRootPart.Position + Vector3.new(0, 2, 0)
+end
+
+local function SetupObject(Object)
+	if not Object:IsA("BasePart") then return end
+
+	local SelectionBox = Instance.new("SelectionBox")
+	SelectionBox.Color3 = Color3.fromRGB(0, 170, 255)
+	SelectionBox.LineThickness = 0.05
+	SelectionBox.SurfaceTransparency = 0.7
+	SelectionBox.SurfaceColor3 = Color3.fromRGB(0, 170, 255)
+	SelectionBox.Adornee = Object
+	SelectionBox.Parent = Object
+
+	Object.Anchored = false
+
+	local BodyPosition = Instance.new("BodyPosition")
+	BodyPosition.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+	BodyPosition.P = 1000
+	BodyPosition.D = 100
+	BodyPosition.Position = Object.Position
+	BodyPosition.Parent = Object
+
+	local BodyGyro = Instance.new("BodyGyro")
+	BodyGyro.MaxTorque = Vector3.zero
+	BodyGyro.P = 1000
+	BodyGyro.D = 100
+	BodyGyro.CFrame = Object.CFrame
+	BodyGyro.Parent = Object
+
+	local ToolPos = GetToolPosition()
+	local InitialDistance = (Object.Position - ToolPos).Magnitude
+
+	return SelectionBox, BodyPosition, BodyGyro, InitialDistance
+end
+
+local function Raycast()
+	local RaycastParameters = RaycastParams.new()
+	RaycastParameters.FilterType = Enum.RaycastFilterType.Exclude
+	RaycastParameters.IgnoreWater = true
+	RaycastParameters.RespectCanCollide = false
+
 	local FilterInstances = {Tool}
 
 	if LocalPlayer.Character then
@@ -62,17 +91,95 @@ local function UpdateRaycastParams()
 		end
 	end
 
-	RaycastParams.FilterDescendantsInstances = FilterInstances
-end
-
-local function PerformRaycast()
+	RaycastParameters.FilterDescendantsInstances = FilterInstances
 
 	local MouseLocation = UserInputService:GetMouseLocation()
-	local CameraRay = Camera:ViewportPointToRay(MouseLocation.X, MouseLocation.Y)
-	local RaycastResult = workspace:Raycast(CameraRay.Origin, CameraRay.Direction * 2048, RaycastParams)
+	local MouseRay = Camera:ViewportPointToRay(MouseLocation.X, MouseLocation.Y)
+
+	local RaycastResult = Workspace:Raycast(MouseRay.Origin, MouseRay.Direction * 2048, RaycastParameters)
 
 	return RaycastResult
 end
+
+local function FindTarget(Object)
+	for I, Data in pairs(SelectedObjects) do
+		if Data["Object"] == Object then
+			return SelectedObjects[I], I
+		end
+	end
+	return nil, nil
+end
+
+local function GetMouseHitPosition()
+	local RaycastResult = Raycast()
+	return RaycastResult and RaycastResult.Position or Camera.CFrame.Position + Camera.CFrame.LookVector * 1000
+end
+
+UserInputService.InputBegan:Connect(function(Input, Processed)
+	if Processed then return end
+
+	if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
+		local RaycastResult = Raycast()
+
+		if RaycastResult and RaycastResult.Instance then
+			local Target = RaycastResult.Instance
+
+			if not Target:IsA("BasePart") then return end
+			if Target.Anchored then return end
+			if not ToolEquipped then return end
+
+			local TargetData, Index = FindTarget(Target)
+			if TargetData then
+				TargetData["SelectionBox"]:Destroy()
+				TargetData["BodyPosition"]:Destroy()
+				TargetData["BodyGyro"]:Destroy()
+				table.remove(SelectedObjects, Index)
+			else
+				local SelectionBox, BodyPosition, BodyGyro, InitialDistance = SetupObject(Target)
+				if SelectionBox and BodyPosition and BodyGyro then
+					table.insert(SelectedObjects, {
+						["Object"] = Target,
+						["SelectionBox"] = SelectionBox,
+						["BodyPosition"] = BodyPosition,
+						["BodyGyro"] = BodyGyro,
+						["Distance"] = InitialDistance,
+						["IsRotating"] = false
+					})
+				end
+			end
+		end
+	elseif Input.KeyCode == CurrentSettings.CloserKey then
+		for _, Data in pairs(SelectedObjects) do
+			Data["Distance"] = math.max(3, Data["Distance"] - 3)
+		end
+	elseif Input.KeyCode == CurrentSettings.FartherAwayKey then
+		for _, Data in pairs(SelectedObjects) do
+			Data["Distance"] = Data["Distance"] + 3
+		end
+	elseif Input.KeyCode == CurrentSettings.ThrowKey then
+		for _, Data in pairs(SelectedObjects) do
+			if Data["Object"] and Data["BodyPosition"] then
+				local ThrowDirection = Camera.CFrame.LookVector
+				Data["Object"].Velocity = ThrowDirection * 150
+				Data["SelectionBox"]:Destroy()
+				Data["BodyPosition"]:Destroy()
+				Data["BodyGyro"]:Destroy()
+				Data = nil
+			end
+		end
+		SelectedObjects = {}
+	elseif Input.KeyCode == CurrentSettings.StabilizeKey then
+		for _, Data in pairs(SelectedObjects) do
+			if Data["BodyGyro"] then
+				Data["Object"].AssemblyLinearVelocity = Vector3.zero
+				Data["Object"].AssemblyAngularVelocity = Vector3.zero
+				Data["IsRotating"] = not Data["IsRotating"]
+				Data["BodyGyro"].MaxTorque = Data["IsRotating"] and 
+					Vector3.new(math.huge, 0, math.huge) or Vector3.zero
+			end
+		end
+	end
+end)
 
 local Gui = nil
 
@@ -109,18 +216,6 @@ local function KeyButton(SettingName, Button, DisplayText)
 		Button.Text = string.format("%s : %s",DisplayText , GetKeycodeText(KeyCode))
 		OnButton = false
 	end)
-end
-
-local function CreateSelectionBox()
-	local SelectionBox = Instance.new("SelectionBox")
-	SelectionBox.Parent = game:GetService("Workspace")
-	SelectionBox.Color3 = SelectionColor
-	SelectionBox.LineThickness = 0.05
-	SelectionBox.SurfaceTransparency = 0.7
-	SelectionBox.SurfaceColor3 = SelectionColor
-	SelectionBox.Adornee = nil
-	
-	return SelectionBox
 end
 
 local function CreateGui()
@@ -261,40 +356,6 @@ local function CreateGui()
 	UIPadding_4.PaddingRight = UDim.new(0.03, 0)
 	UIPadding_4.PaddingTop = UDim.new(0.03, 0)
 
-	local SelectTypeSetting = Instance.new("TextButton")
-	SelectTypeSetting.FontFace = Font.new("rbxasset://fonts/families/Roboto.json", Enum.FontWeight.Regular, Enum.FontStyle.Italic)
-	SelectTypeSetting.Text = "Select Type : Hold"
-
-	if CurrentSettings["SelectType"] == 2 then
-		SelectTypeSetting.Text = "Select Type : Click Select / Unselect"
-	end
-
-	if CurrentSettings["SelectType"] == 3 then
-		SelectTypeSetting.Text = "Select Type : Button"
-	end
-
-	SelectTypeSetting.TextColor = BrickColor.new("Institutional white")
-	SelectTypeSetting.TextColor3 = Color3.fromRGB(255, 255, 255)
-	SelectTypeSetting.TextScaled = true
-	SelectTypeSetting.TextWrapped = true
-	SelectTypeSetting.TextXAlignment = Enum.TextXAlignment.Left
-	SelectTypeSetting.AutoButtonColor = false
-	SelectTypeSetting.AnchorPoint = Vector2.new(0.5, 0.5)
-	SelectTypeSetting.BackgroundColor3 = Color3.fromRGB(59, 59, 67)
-	SelectTypeSetting.BorderColor = BrickColor.new("Really black")
-	SelectTypeSetting.BorderColor3 = Color3.fromRGB(0, 0, 0)
-	SelectTypeSetting.BorderSizePixel = 0
-	SelectTypeSetting.LayoutOrder = 4
-	SelectTypeSetting.Selectable = false
-	SelectTypeSetting.Size = UDim2.new(1, 0, 0.1, 0)
-	SelectTypeSetting.Name = "SelectTypeSetting"
-
-	local UIPadding_5 = Instance.new("UIPadding")
-	UIPadding_5.PaddingBottom = UDim.new(0.03, 0)
-	UIPadding_5.PaddingLeft = UDim.new(0.03, 0)
-	UIPadding_5.PaddingRight = UDim.new(0.03, 0)
-	UIPadding_5.PaddingTop = UDim.new(0.03, 0)
-
 	local SettingsButton = Instance.new("TextButton")
 	SettingsButton.FontFace = Font.new("rbxasset://fonts/families/Roboto.json", Enum.FontWeight.Regular, Enum.FontStyle.Italic)
 	SettingsButton.Text = "Settings"
@@ -320,52 +381,6 @@ local function CreateGui()
 	local UICorner_2 = Instance.new("UICorner")
 	UICorner_2.CornerRadius = UDim.new(0.2, 0)
 
-	local PickUpButton = Instance.new("TextButton")
-	PickUpButton.FontFace = Font.new("rbxasset://fonts/families/Roboto.json", Enum.FontWeight.Regular, Enum.FontStyle.Italic)
-	PickUpButton.Text = "Pick Up"
-	PickUpButton.TextColor = BrickColor.new("Institutional white")
-	PickUpButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-	PickUpButton.TextScaled = true
-	PickUpButton.TextSize = 14
-	PickUpButton.TextWrapped = true
-	PickUpButton.AutoButtonColor = false
-	PickUpButton.AnchorPoint = Vector2.new(1, 1)
-	PickUpButton.BackgroundColor3 = Color3.fromRGB(47, 47, 53)
-	PickUpButton.BorderColor = BrickColor.new("Really black")
-	PickUpButton.BorderColor3 = Color3.fromRGB(0, 0, 0)
-	PickUpButton.BorderSizePixel = 0
-	PickUpButton.Position = UDim2.new(0.88, 0, 0.98, 0)
-	PickUpButton.Size = UDim2.new(0.22, 0, 0.08, 0)
-	PickUpButton.Name = "PickUpButton"
-
-	if CurrentSettings["SelectType"] == 3 then
-		PickUpButton.Visible = true
-	else
-		PickUpButton.Visible = false
-	end
-
-	SelectTypeSetting.MouseButton1Click:Connect(function()
-		if CurrentSettings.SelectType == 1 then
-			CurrentSettings.SelectType = 2
-			ReplicatedStorage:SetAttribute("SelectType", 2)
-			PickUpButton.Visible = false
-			SelectTypeSetting.Text = "Select Type : Click Select / Unselect"
-		elseif CurrentSettings.SelectType == 2 then
-			CurrentSettings.SelectType = 3
-			ReplicatedStorage:SetAttribute("SelectType", 3)
-			PickUpButton.Visible = true
-			SelectTypeSetting.Text = "Select Type : Button"
-		elseif CurrentSettings.SelectType == 3 then
-			CurrentSettings.SelectType = 1
-			ReplicatedStorage:SetAttribute("SelectType", 1)
-			PickUpButton.Visible = false
-			SelectTypeSetting.Text = "Select Type : Hold"
-		end
-	end)
-
-	local UICorner_3 = Instance.new("UICorner")
-	UICorner_3.CornerRadius = UDim.new(0.2, 0)
-
 	TelekinesisGui.Parent = PlayerGui
 	Settings.Parent = TelekinesisGui
 	UICorner.Parent = Settings
@@ -378,253 +393,13 @@ local function CreateGui()
 	UIPadding_3.Parent = CloserKeySetting
 	FartherAwayKeySetting.Parent = Settings
 	UIPadding_4.Parent = FartherAwayKeySetting
-	SelectTypeSetting.Parent = Settings
-	UIPadding_5.Parent = SelectTypeSetting
 	SettingsButton.Parent = TelekinesisGui
 	UICorner_2.Parent = SettingsButton
-	PickUpButton.Parent = TelekinesisGui
-	UICorner_3.Parent = PickUpButton
 
 	return TelekinesisGui
 end
 
-local function GetMouseHitPosition()
-	local RaycastResult = PerformRaycast()
-	return RaycastResult and RaycastResult.Position or Camera.CFrame.Position + Camera.CFrame.LookVector * 1000
-end
-
-local function GetMouseTarget()
-	local RaycastResult = PerformRaycast()
-	return RaycastResult and RaycastResult.Instance or nil
-end
-
-local function UpdateSelectionHighlight(Object)
-	local Success, ErrorMsg = pcall(function()
-		if Object then
-			if CurrentSelectionBox then
-				CurrentSelectionBox.Adornee = nil
-				CurrentSelectionBox.Parent = nil
-				CurrentSelectionBox:Destroy()
-				CurrentSelectionBox = nil
-			end
-			if not ToolEquipped then return end
-			
-			CurrentSelectionBox = CreateSelectionBox()
-
-			CurrentSelectionBox.Parent = Object
-			CurrentSelectionBox.Adornee = Object
-		else
-			if CurrentSelectionBox then
-				CurrentSelectionBox.Adornee = nil
-				CurrentSelectionBox.Parent = nil
-				CurrentSelectionBox:Destroy()
-				CurrentSelectionBox = nil
-			end
-		end
-	end)
-	
-	if not Success then
-		warn(tostring(ErrorMsg))
-	end
-end
-
-local function RemoveBodyGyro(Object)
-	if Object and Object:IsDescendantOf(game) then
-		for _, Child in ipairs(Object:GetChildren()) do
-			if Child:IsA("BodyGyro") then
-				Child:Destroy()
-			end
-		end
-	end
-end
-
-local function CleanupObject()
-	if SelectedObject then
-		if SelectedObject:IsDescendantOf(game) then
-			BodyPosition.Parent = nil
-			RemoveBodyGyro(SelectedObject)
-		end
-		SelectedObject = nil
-		IsObjectSelected = false
-		PendingObject = nil
-		if CurrentSelectionBox then
-			CurrentSelectionBox:Destroy()
-		end
-		if TextButton then
-			TextButton.Text = "Pick Up"
-		end
-	end
-end
-
-local function GetToolPosition()
-	local Character = LocalPlayer.Character
-
-	if not Character then
-		if Camera then
-			return Camera.CFrame.Position
-		else
-			return Vector3.zero
-		end
-	end
-	
-	local ToolCFrame = Character:GetPivot() * CFrame.new(0, 1, 0)
-	return ToolCFrame.Position
-end
-
-local function HandleObjectMovement()
-	if not SelectedObject or not SelectedObject:IsDescendantOf(game) then 
-		CleanupObject()
-		return 
-	end
-
-	local MouseHitPos = GetMouseHitPosition()
-	local ToolPosition = GetToolPosition()
-
-	if not MouseHitPos or not ToolPosition then return end
-
-	local AimCFrame = CFrame.new(ToolPosition, MouseHitPos)
-
-	if not BodyPosition or not BodyPosition.Parent then return end
-
-	BodyPosition.Parent = SelectedObject
-	BodyPosition.Position = ToolPosition + AimCFrame.LookVector * math.min(GrabDistance or 10, MaxDistance)
-end
-
-local function GetGrabDistance()
-	if not SelectedObject then return 10 end
-	local ToolPosition = GetToolPosition()
-	return (SelectedObject.CFrame.Position - ToolPosition).Magnitude
-end
-
-local function HandleSelection()
-	if CurrentSettings.SelectType == 1 then
-		if IsMouseDown and not SelectedObject then
-			local HitObject = GetMouseTarget()
-			if HitObject and not HitObject.Anchored then
-				SelectedObject = HitObject
-				GrabDistance = GetGrabDistance()
-				UpdateSelectionHighlight(SelectedObject)
-			end
-		elseif not IsMouseDown and SelectedObject then
-			CleanupObject()
-		end
-	elseif CurrentSettings.SelectType == 2 then
-		if not IsMouseDown then return end
-
-		if not IsObjectSelected then
-			local HitObject = GetMouseTarget()
-			if HitObject and not HitObject.Anchored then
-				SelectedObject = HitObject
-				GrabDistance = GetGrabDistance()
-				UpdateSelectionHighlight(SelectedObject)
-				IsObjectSelected = true
-			end
-		else
-			CleanupObject()
-		end
-		IsMouseDown = false
-
-	elseif CurrentSettings.SelectType == 3 then
-		if not IsMouseDown then return end
-
-		if not IsObjectSelected then
-			local hitObject = GetMouseTarget()
-			if hitObject and not hitObject.Anchored then
-				PendingObject = hitObject
-				UpdateSelectionHighlight(PendingObject)
-			end
-		end
-		IsMouseDown = false
-	end
-end
-
-local function HandleTextButtonClick()
-	if CurrentSettings.SelectType ~= 3 then return end
-
-	if not IsObjectSelected and PendingObject then
-		SelectedObject = PendingObject
-		GrabDistance = GetGrabDistance()
-		IsObjectSelected = true
-		PendingObject = nil
-		TextButton.Text = "Drop"
-	else
-		CleanupObject()
-		TextButton.Text = "Pick Up"
-	end
-end
-
-UserInputService.InputBegan:Connect(function(Input, Processed)
-	if not IsScriptActive then return end
-
-	if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
-		IsMouseDown = true
-		HandleSelection()
-	elseif Input.UserInputType == Enum.UserInputType.Keyboard then
-		if Input.KeyCode == CurrentSettings.CloserKey and GrabDistance then
-			GrabDistance = math.max(GrabDistance - 5, MinDistance)
-		elseif Input.KeyCode == CurrentSettings.FartherAwayKey and GrabDistance then
-			GrabDistance = GrabDistance + 5
-		elseif Input.KeyCode == CurrentSettings.StabilizeKey and SelectedObject then
-			RemoveBodyGyro(SelectedObject)
-			local BodyGyro = Instance.new("BodyGyro")
-			BodyGyro.MaxTorque = Vector3.new(math.huge, 0, math.huge)
-			BodyGyro.CFrame = CFrame.new(SelectedObject.CFrame.Position)
-			BodyGyro.Parent = SelectedObject
-
-			SelectedObject.AssemblyLinearVelocity = Vector3.zero
-			SelectedObject.AssemblyAngularVelocity = Vector3.zero
-		elseif Input.KeyCode == CurrentSettings.ThrowKey and SelectedObject then
-			local ThrowDirection = Camera.CFrame.LookVector * 100
-			SelectedObject.Velocity = ThrowDirection
-			CleanupObject()
-		end
-	end
-end)
-
-UserInputService.InputEnded:Connect(function(Input, Processed)
-	if not IsScriptActive then return end
-
-	if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
-		IsMouseDown = false
-		if CurrentSettings.SelectType == 1 then
-			CleanupObject()
-		end
-	end
-end)
-
-local RunServiceConnection = game:GetService("RunService").RenderStepped:Connect(function()
-	if SelectedObject and IsScriptActive then
-		HandleObjectMovement()
-	end
-end)
-
-table.insert(Connections, RunServiceConnection)
-
-Tool.Destroying:Connect(function()
-	if Gui then
-		Gui:Destroy()
-		Gui = nil
-	end
-
-	for _, Connection in ipairs(Connections) do
-		Connection:Disconnect()
-	end
-
-	table.clear(Connections)
-
-	IsScriptActive = false
-	CleanupObject()
-	if CurrentSelectionBox then
-		CurrentSelectionBox.Adornee = nil
-		CurrentSelectionBox.Parent = nil
-		CurrentSelectionBox:Destroy()
-		CurrentSelectionBox = nil
-	end
-	BodyPosition:Destroy()
-end)
-
 Tool.Equipped:Connect(function()
-	ToolEquipped = true
 	for SettingName, SettingValue in pairs(CurrentSettings) do
 		if not ReplicatedStorage:GetAttribute(SettingName) then
 			ReplicatedStorage:SetAttribute(SettingName, SettingValue)
@@ -632,55 +407,85 @@ Tool.Equipped:Connect(function()
 			CurrentSettings[SettingName] = ReplicatedStorage:GetAttribute(SettingName)
 		end
 	end
-
-	IsScriptActive = true
+	
+	ToolEquipped = true
+	
 	if Gui then
 		Gui:Destroy()
 		Gui = nil
 	end
 
 	Gui = CreateGui()
-
-	TextButton = Gui:FindFirstChild("PickUpButton")
-
-	if TextButton then
-		TextButton.MouseButton1Click:Connect(HandleTextButtonClick)
-	end
-
-	UpdateRaycastParams()
+	
 end)
 
 Tool.Unequipped:Connect(function()
+	if Gui then
+		Gui:Destroy()
+		Gui = nil
+	end
+	
 	ToolEquipped = false
-	IsScriptActive = false
-	CleanupObject()
-	if not Gui then
-		return
-	end
-
-	Gui:Destroy()
-	Gui = nil
-
-	if CurrentSelectionBox then
-		CurrentSelectionBox.Adornee = nil
-		CurrentSelectionBox.Parent = nil
-		CurrentSelectionBox:Destroy()
-		CurrentSelectionBox = nil
-	end
-end)
-
-PlayerService.PlayerAdded:Connect(function(Player)
-	Player.CharacterAdded:Connect(function()
-		if not IsScriptActive then
-			return
+	for _, Data in pairs(SelectedObjects) do
+		if Data["Object"] then
+			Data["SelectionBox"]:Destroy()
+			Data["BodyPosition"]:Destroy()
+			if Data["BodyGyro"] then
+				Data["BodyGyro"]:Destroy()
+			end
 		end
-		UpdateRaycastParams()
-	end)
+	end
+	SelectedObjects = {}
 end)
 
-PlayerService.PlayerRemoving:Connect(function(Player)
-	if not IsScriptActive then
-		return
+Tool.Destroying:Connect(function()
+	if Gui then
+		Gui:Destroy()
+		Gui = nil
 	end
-	UpdateRaycastParams()
+	
+	for _, Data in pairs(SelectedObjects) do
+		if Data["SelectionBox"] then
+			Data["SelectionBox"]:Destroy()
+		end
+		if Data["BodyPosition"] then
+			Data["BodyPosition"]:Destroy()
+		end
+		if Data["BodyGyro"] then
+			Data["BodyGyro"]:Destroy()
+		end
+	end
+	
+	SelectedObjects = {}
+end)
+
+RunService.RenderStepped:Connect(function()
+	for _, Data in pairs(SelectedObjects) do
+		if Data["Object"] and Data["BodyPosition"] then
+			local MouseHitPos = GetMouseHitPosition()
+			local ToolPosition = GetToolPosition()
+
+			if not MouseHitPos or not ToolPosition then continue end
+
+			local AimCFrame = CFrame.new(ToolPosition, MouseHitPos)
+			local TargetPosition = ToolPosition + (AimCFrame.LookVector * Data["Distance"])
+
+			Data["BodyPosition"].Position = TargetPosition
+			if Data["BodyGyro"] then
+				Data["BodyGyro"].CFrame = AimCFrame
+			end
+		end
+		if not Data["Object"] then
+			if Data["SelectionBox"] then
+				Data["SelectionBox"]:Destroy()
+			end
+			if Data["BodyPosition"] then
+				Data["BodyPosition"]:Destroy()
+			end
+			if Data["BodyGyro"] then
+				Data["BodyGyro"]:Destroy()
+			end
+			table.remove(SelectedObjects, table.find(SelectedObjects, Data))
+		end
+	end
 end)
