@@ -16,13 +16,11 @@ TelekinesisGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 TelekinesisGui.Name = "TelekinesisGui"
 
 local Button = Instance.new("TextButton")
-Button.FontFace = Font.new("rbxasset://fonts/families/Roboto.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
-Button.FontSize = Enum.FontSize.Size14
+Button.FontFace = Font.new("rbxasset://fonts/families/Roboto.json", Enum.FontWeight.Regular, Enum.FontStyle.Italic)
 Button.Text = "T"
 Button.TextColor = BrickColor.new("Institutional white")
 Button.TextColor3 = Color3.fromRGB(255, 255, 255)
 Button.TextScaled = true
-Button.TextSize = 14
 Button.TextWrapped = true
 Button.AutoButtonColor = false
 Button.AnchorPoint = Vector2.new(0, 1)
