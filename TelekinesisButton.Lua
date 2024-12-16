@@ -13,7 +13,6 @@ Button.TextColor = BrickColor.new("Institutional white")
 Button.TextColor3 = Color3.fromRGB(255, 255, 255)
 Button.TextScaled = true
 Button.TextSize = 14
-Button.TextWrap = true
 Button.TextWrapped = true
 Button.AutoButtonColor = false
 Button.AnchorPoint = Vector2.new(0, 1)
@@ -22,7 +21,7 @@ Button.BorderColor = BrickColor.new("Really black")
 Button.BorderColor3 = Color3.fromRGB(0, 0, 0)
 Button.BorderSizePixel = 0
 Button.Position = UDim2.new(0.01, 0, 0.98, 0)
-Button.Size = UDim2.new(0.03, 0, 0.6, 0)
+Button.Size = UDim2.new(0.075, 0, 0.082, 0)
 Button.Name = "Button"
 
 local UIAspectRatioConstraint = Instance.new("UIAspectRatioConstraint")
