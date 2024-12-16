@@ -153,7 +153,7 @@ local function CreateGui()
 	UIListLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 
 	local StabilizeKeySetting = Instance.new("TextButton")
-	StabilizeKeySetting.FontFace = Font.new("rbxasset://fonts/families/Rooboto.json", Enum.FontWeight.Regular, Enum.FontStyle.Italic)
+	StabilizeKeySetting.FontFace = Font.new("rbxasset://fonts/families/Roboto.json", Enum.FontWeight.Regular, Enum.FontStyle.Italic)
 	StabilizeKeySetting.Text = ""
 	StabilizeKeySetting.TextColor = BrickColor.new("Institutional white")
 	StabilizeKeySetting.TextColor3 = Color3.fromRGB(255, 255, 255)
