@@ -29,6 +29,7 @@ local PendingObject = nil
 local TextButton = nil
 local MaxDistance = 10000
 local Connections = {}
+local ToolEquipped = false
 local CurrentSelectionBox = nil
 
 for SettingName, SettingValue in pairs(CurrentSettings) do
@@ -406,6 +407,8 @@ local function UpdateSelectionHighlight(Object)
 				CurrentSelectionBox:Destroy()
 				CurrentSelectionBox = nil
 			end
+			if not ToolEquipped then return end
+			
 			CurrentSelectionBox = CreateSelectionBox()
 
 			CurrentSelectionBox.Parent = Object
@@ -621,6 +624,7 @@ Tool.Destroying:Connect(function()
 end)
 
 Tool.Equipped:Connect(function()
+	ToolEquipped = true
 	for SettingName, SettingValue in pairs(CurrentSettings) do
 		if not ReplicatedStorage:GetAttribute(SettingName) then
 			ReplicatedStorage:SetAttribute(SettingName, SettingValue)
@@ -647,6 +651,7 @@ Tool.Equipped:Connect(function()
 end)
 
 Tool.Unequipped:Connect(function()
+	ToolEquipped = false
 	IsScriptActive = false
 	CleanupObject()
 	if not Gui then
