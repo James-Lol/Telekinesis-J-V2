@@ -1,5 +1,5 @@
 local TelekinesisGui = Instance.new("ScreenGui")
-TelekinesisGui.DisplayOrder = 1000000000
+TelekinesisGui.DisplayOrder = 2147483647
 TelekinesisGui.IgnoreGuiInset = true
 TelekinesisGui.ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets
 TelekinesisGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
@@ -30,7 +30,7 @@ local UIAspectRatioConstraint = Instance.new("UIAspectRatioConstraint")
 local UICorner = Instance.new("UICorner")
 UICorner.CornerRadius = UDim.new(0.25, 0)
 
-TelekinesisGui.Parent = game:GetService("StarterGui")
+TelekinesisGui.Parent = game:GetService("Players").LocalPlayer:FindFirstChild("PlayerGui")
 Button.Parent = TelekinesisGui
 UIAspectRatioConstraint.Parent = Button
 UICorner.Parent = Button
