@@ -241,6 +241,15 @@ local function CreateGui()
 	local SelectTypeSetting = Instance.new("TextButton")
 	SelectTypeSetting.FontFace = Font.new("rbxasset://fonts/families/Roboto.json", Enum.FontWeight.Regular, Enum.FontStyle.Italic)
 	SelectTypeSetting.Text = "Select Type : Hold"
+	
+	if CurrentSettings["SelectType"] == 2 then
+		SelectTypeSetting.Text = "Select Type : Click Select / Unselect"
+	end
+	
+	if CurrentSettings["SelectType"] == 3 then
+		SelectTypeSetting.Text = "Select Type : Button"
+	end
+
 	SelectTypeSetting.TextColor = BrickColor.new("Institutional white")
 	SelectTypeSetting.TextColor3 = Color3.fromRGB(255, 255, 255)
 	SelectTypeSetting.TextScaled = true
@@ -305,8 +314,12 @@ local function CreateGui()
 	PickUpButton.Position = UDim2.new(0.88, 0, 0.98, 0)
 	PickUpButton.Size = UDim2.new(0.22, 0, 0.08, 0)
 	PickUpButton.Name = "PickUpButton"
-
-	PickUpButton.Visible = false
+	
+	if CurrentSettings["SelectType"] == 3 then
+		PickUpButton.Visible = true
+	else
+		PickUpButton.Visible = false
+	end
 
 	SelectTypeSetting.MouseButton1Click:Connect(function()
 		if CurrentSettings.SelectType == 1 then
