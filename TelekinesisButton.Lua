@@ -10,6 +10,7 @@ ReplicatedStorage:SetAttribute("TelekinesisJV2",true)
 local TelekinesisGui = Instance.new("ScreenGui")
 TelekinesisGui.DisplayOrder = 2147483647
 TelekinesisGui.IgnoreGuiInset = true
+TelekinesisGui.ResetOnSpawn = false
 TelekinesisGui.ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets
 TelekinesisGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 TelekinesisGui.Name = "TelekinesisGui"
