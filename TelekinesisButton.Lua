@@ -1,3 +1,12 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+if ReplicatedStorage:GetAttribute("TelekinesisJV2") then
+	warn("Telekinesis-J-V2 Already loaded!")
+	return
+end
+
+ReplicatedStorage:SetAttribute("TelekinesisJV2",true)
+
 local TelekinesisGui = Instance.new("ScreenGui")
 TelekinesisGui.DisplayOrder = 2147483647
 TelekinesisGui.IgnoreGuiInset = true
