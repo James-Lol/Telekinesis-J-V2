@@ -12,7 +12,7 @@ Tool.Parent = LocalPlayer.Backpack
 local CurrentSettings = {
 	["CloserKey"] = Enum.KeyCode.Q,
 	["FartherAwayKey"] = Enum.KeyCode.E,
-	["RotateKey"] = Enum.KeyCode.R,
+	["StabilizeKey"] = Enum.KeyCode.R,
 	["ThrowKey"] = Enum.KeyCode.Z,
 	["SelectType"] = 1,
 }
@@ -131,25 +131,25 @@ local function CreateGui()
 	UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	UIListLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 
-	local RotateKeySetting = Instance.new("TextButton")
-	RotateKeySetting.FontFace = Font.new("rbxasset://fonts/families/Roboto.json", Enum.FontWeight.Regular, Enum.FontStyle.Italic)
-	RotateKeySetting.Text = ""
-	RotateKeySetting.TextColor = BrickColor.new("Institutional white")
-	RotateKeySetting.TextColor3 = Color3.fromRGB(255, 255, 255)
-	RotateKeySetting.TextScaled = true
-	RotateKeySetting.TextWrapped = true
-	RotateKeySetting.TextXAlignment = Enum.TextXAlignment.Left
-	RotateKeySetting.AutoButtonColor = false
-	RotateKeySetting.AnchorPoint = Vector2.new(0.5, 0.5)
-	RotateKeySetting.BackgroundColor3 = Color3.fromRGB(59, 59, 67)
-	RotateKeySetting.BorderColor = BrickColor.new("Really black")
-	RotateKeySetting.BorderColor3 = Color3.fromRGB(0, 0, 0)
-	RotateKeySetting.BorderSizePixel = 0
-	RotateKeySetting.Selectable = false
-	RotateKeySetting.Size = UDim2.new(1, 0, 0.1, 0)
-	RotateKeySetting.Name = "RotateKeySetting"
+	local StabilizeKeySetting = Instance.new("TextButton")
+	StabilizeKeySetting.FontFace = Font.new("rbxasset://fonts/families/Roboto.json", Enum.FontWeight.Regular, Enum.FontStyle.Italic)
+	StabilizeKeySetting.Text = ""
+	StabilizeKeySetting.TextColor = BrickColor.new("Institutional white")
+	StabilizeKeySetting.TextColor3 = Color3.fromRGB(255, 255, 255)
+	StabilizeKeySetting.TextScaled = true
+	StabilizeKeySetting.TextWrapped = true
+	StabilizeKeySetting.TextXAlignment = Enum.TextXAlignment.Left
+	StabilizeKeySetting.AutoButtonColor = false
+	StabilizeKeySetting.AnchorPoint = Vector2.new(0.5, 0.5)
+	StabilizeKeySetting.BackgroundColor3 = Color3.fromRGB(59, 59, 67)
+	StabilizeKeySetting.BorderColor = BrickColor.new("Really black")
+	StabilizeKeySetting.BorderColor3 = Color3.fromRGB(0, 0, 0)
+	StabilizeKeySetting.BorderSizePixel = 0
+	StabilizeKeySetting.Selectable = false
+	StabilizeKeySetting.Size = UDim2.new(1, 0, 0.1, 0)
+	StabilizeKeySetting.Name = "StabilizeKeySetting"
 
-	KeyButton("RotateKey", RotateKeySetting, "Rotate Key")
+	KeyButton("StabilizeKey", StabilizeKeySetting, "Stabilize Key")
 
 	local UIPadding = Instance.new("UIPadding")
 	UIPadding.PaddingBottom = UDim.new(0.03, 0)
@@ -305,9 +305,9 @@ local function CreateGui()
 	PickUpButton.Position = UDim2.new(0.88, 0, 0.98, 0)
 	PickUpButton.Size = UDim2.new(0.22, 0, 0.08, 0)
 	PickUpButton.Name = "PickUpButton"
-	
+
 	PickUpButton.Visible = false
-	
+
 	SelectTypeSetting.MouseButton1Click:Connect(function()
 		if CurrentSettings.SelectType == 1 then
 			CurrentSettings.SelectType = 2
@@ -334,8 +334,8 @@ local function CreateGui()
 	Settings.Parent = TelekinesisGui
 	UICorner.Parent = Settings
 	UIListLayout.Parent = Settings
-	RotateKeySetting.Parent = Settings
-	UIPadding.Parent = RotateKeySetting
+	StabilizeKeySetting.Parent = Settings
+	UIPadding.Parent = StabilizeKeySetting
 	ThrowKeySetting.Parent = Settings
 	UIPadding_2.Parent = ThrowKeySetting
 	CloserKeySetting.Parent = Settings
@@ -421,13 +421,19 @@ local function HandleObjectMovement()
 	BodyPosition.Position = ToolPosition + AimCFrame.LookVector * GrabDistance
 end
 
+local function GetGrabDistance()
+	if not SelectedObject then return 10 end
+	local ToolPosition = GetToolPosition()
+	return (SelectedObject.CFrame.Position - ToolPosition).Magnitude
+end
+
 local function HandleSelection()
 	if CurrentSettings.SelectType == 1 then
 		if IsMouseDown and not SelectedObject then
 			local HitObject = GetMouseTarget()
 			if HitObject and not HitObject.Anchored then
 				SelectedObject = HitObject
-				GrabDistance = (SelectedObject.Position - Camera.CFrame.Position).Magnitude
+				GrabDistance = GetGrabDistance()
 				UpdateSelectionHighlight(SelectedObject)
 			end
 		elseif not IsMouseDown and SelectedObject then
@@ -440,7 +446,7 @@ local function HandleSelection()
 			local HitObject = GetMouseTarget()
 			if HitObject and not HitObject.Anchored then
 				SelectedObject = HitObject
-				GrabDistance = (SelectedObject.Position - Camera.CFrame.Position).Magnitude
+				GrabDistance = GetGrabDistance()
 				UpdateSelectionHighlight(SelectedObject)
 				IsObjectSelected = true
 			end
@@ -468,7 +474,7 @@ local function HandleTextButtonClick()
 
 	if not IsObjectSelected and PendingObject then
 		SelectedObject = PendingObject
-		GrabDistance = (SelectedObject.Position - Camera.CFrame.Position).Magnitude
+		GrabDistance = GetGrabDistance()
 		IsObjectSelected = true
 		PendingObject = nil
 		TextButton.Text = "Drop"
@@ -481,24 +487,23 @@ end
 UserInputService.InputBegan:Connect(function(Input, Processed)
 	if not IsScriptActive then return end
 
-	if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+	if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
 		IsMouseDown = true
 		HandleSelection()
 	elseif Input.UserInputType == Enum.UserInputType.Keyboard then
-		if Input.KeyCode == CurrentSettings.CloserKey and GrabDistance and GrabDistance >= MinDistance then
-			GrabDistance = GrabDistance - 7
-		elseif Input.KeyCode == CurrentSettings.FartherAwayKey then
-			GrabDistance = (GrabDistance or 10) + 7
-		elseif Input.KeyCode == CurrentSettings.RotateKey and SelectedObject then
-			if SelectedObject:FindFirstChildWhichIsA("BodyGyro") then
-				RemoveBodyGyro(SelectedObject)
-			else
-				RemoveBodyGyro(SelectedObject)
-				local BodyGyro = Instance.new("BodyGyro")
-				BodyGyro.MaxTorque = Vector3.new(math.huge, 0, math.huge)
-				BodyGyro.CFrame = CFrame.new(SelectedObject.CFrame.Position)
-				BodyGyro.Parent = SelectedObject
-			end
+		if Input.KeyCode == CurrentSettings.CloserKey and GrabDistance then
+			GrabDistance = math.max(GrabDistance - 5, MinDistance)
+		elseif Input.KeyCode == CurrentSettings.FartherAwayKey and GrabDistance then
+			GrabDistance = GrabDistance + 5
+		elseif Input.KeyCode == CurrentSettings.StabilizeKey and SelectedObject then
+			RemoveBodyGyro(SelectedObject)
+			local BodyGyro = Instance.new("BodyGyro")
+			BodyGyro.MaxTorque = Vector3.new(math.huge, 0, math.huge)
+			BodyGyro.CFrame = CFrame.new(SelectedObject.CFrame.Position)
+			BodyGyro.Parent = SelectedObject
+
+			SelectedObject.AssemblyLinearVelocity = Vector3.zero
+			SelectedObject.AssemblyAngularVelocity = Vector3.zero
 		elseif Input.KeyCode == CurrentSettings.ThrowKey and SelectedObject then
 			local ThrowDirection = Camera.CFrame.LookVector * 100
 			SelectedObject.Velocity = ThrowDirection
@@ -510,7 +515,7 @@ end)
 UserInputService.InputEnded:Connect(function(Input, Processed)
 	if not IsScriptActive then return end
 
-	if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+	if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
 		IsMouseDown = false
 		if CurrentSettings.SelectType == 1 then
 			CleanupObject()
@@ -529,7 +534,7 @@ Tool.Destroying:Connect(function()
 		Gui:Destroy()
 		Gui = nil
 	end
-	
+
 	IsScriptActive = false
 	CleanupObject()
 	SelectionBox:Destroy()
@@ -537,6 +542,14 @@ Tool.Destroying:Connect(function()
 end)
 
 Tool.Equipped:Connect(function()
+	for SettingName, SettingValue in pairs(CurrentSettings) do
+		if not ReplicatedStorage:GetAttribute(SettingName) then
+			ReplicatedStorage:SetAttribute(SettingName, SettingValue)
+		else
+			CurrentSettings[SettingName] = ReplicatedStorage:GetAttribute(SettingName)
+		end
+	end
+
 	IsScriptActive = true
 	if Gui then
 		Gui:Destroy()
@@ -544,9 +557,9 @@ Tool.Equipped:Connect(function()
 	end
 
 	Gui = CreateGui()
-	
+
 	TextButton = Gui:FindFirstChild("PickUpButton")
-	
+
 	if TextButton then
 		TextButton.MouseButton1Click:Connect(HandleTextButtonClick)
 	end
