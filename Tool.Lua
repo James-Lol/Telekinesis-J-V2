@@ -496,7 +496,6 @@ UserInputService.InputBegan:Connect(function(Input, Processed)
 				RemoveBodyGyro(SelectedObject)
 				local BodyGyro = Instance.new("BodyGyro")
 				BodyGyro.MaxTorque = Vector3.new(math.huge, 0, math.huge)
-				BodyGyro.D = 100
 				BodyGyro.CFrame = CFrame.new(SelectedObject.CFrame.Position)
 				BodyGyro.Parent = SelectedObject
 			end
