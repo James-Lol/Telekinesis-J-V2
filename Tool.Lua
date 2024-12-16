@@ -117,7 +117,8 @@ local function CreateSelectionBox()
 	SelectionBox.LineThickness = 0.05
 	SelectionBox.SurfaceTransparency = 0.7
 	SelectionBox.SurfaceColor3 = SelectionColor
-
+	SelectionBox.Adornee = nil
+	
 	return SelectionBox
 end
 
@@ -397,23 +398,30 @@ local function GetMouseTarget()
 end
 
 local function UpdateSelectionHighlight(Object)
-	if Object then
-		if CurrentSelectionBox then
-			CurrentSelectionBox.Adornee = nil
-			CurrentSelectionBox.Parent = nil
-		else
+	local Success, ErrorMsg = pcall(function()
+		if Object then
+			if CurrentSelectionBox then
+				CurrentSelectionBox.Adornee = nil
+				CurrentSelectionBox.Parent = nil
+				CurrentSelectionBox:Destroy()
+				CurrentSelectionBox = nil
+			end
 			CurrentSelectionBox = CreateSelectionBox()
-		end
 
-		CurrentSelectionBox.Parent = game:GetService("Workspace")
-		CurrentSelectionBox.Adornee = Object
-	else
-		if CurrentSelectionBox then
-			CurrentSelectionBox.Adornee = nil
-			CurrentSelectionBox.Parent = nil
-			CurrentSelectionBox:Destroy()
-			CurrentSelectionBox = nil
+			CurrentSelectionBox.Parent = Object
+			CurrentSelectionBox.Adornee = Object
+		else
+			if CurrentSelectionBox then
+				CurrentSelectionBox.Adornee = nil
+				CurrentSelectionBox.Parent = nil
+				CurrentSelectionBox:Destroy()
+				CurrentSelectionBox = nil
+			end
 		end
+	end)
+	
+	if not Success then
+		warn(tostring(ErrorMsg))
 	end
 end
 
