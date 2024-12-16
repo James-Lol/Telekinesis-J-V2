@@ -398,9 +398,10 @@ end
 
 local function UpdateSelectionHighlight(Object)
 	if Object then
-		if not CurrentSelectionBox  or not CurrentSelectionBox:IsDescendantOf(game) then
-			CurrentSelectionBox = CreateSelectionBox()
+		if CurrentSelectionBox then
+			CurrentSelectionBox:Destroy()
 		end
+		CurrentSelectionBox = CreateSelectionBox()
 		CurrentSelectionBox.Parent = Object
 		CurrentSelectionBox.Adornee = Object
 	else
