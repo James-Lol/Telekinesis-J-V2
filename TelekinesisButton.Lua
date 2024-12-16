@@ -38,6 +38,6 @@ UICorner.Parent = Button
 Button.MouseButton1Click:Connect(function()
 	local Code = game:HttpGet("https://raw.githubusercontent.com/James-Lol/Telekinesis-J-V2/refs/heads/main/Tool.Lua")
 	local Success, ErrorMsg = pcall(function()
-		loadstring(Code)
+		loadstring(Code)()
 	end)
 end)
