@@ -16,7 +16,7 @@ local CurrentSettings = {
 	["CloserKey"] = Enum.KeyCode.Q,
 	["FartherAwayKey"] = Enum.KeyCode.E,
 	["StabilizeKey"] = Enum.KeyCode.R,
-	["ThrowKey"] = Enum.KeyCode.Y
+	["ThrowKey"] = Enum.KeyCode.Z
 }
 
 for SettingName, SettingValue in pairs(CurrentSettings) do
@@ -55,16 +55,16 @@ local function SetupObject(Object)
 
 	local BodyPosition = Instance.new("BodyPosition")
 	BodyPosition.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-	BodyPosition.P = 1000
-	BodyPosition.D = 100
+	BodyPosition.P = 40000
+	BodyPosition.D = 700
 	BodyPosition.Position = Object.Position
 	BodyPosition.Parent = Object
 
 	local BodyGyro = Instance.new("BodyGyro")
 	BodyGyro.MaxTorque = Vector3.zero
-	BodyGyro.P = 1000
-	BodyGyro.D = 100
-	BodyGyro.CFrame = Object.CFrame
+	BodyGyro.P = 10000
+	BodyGyro.D = 200
+	BodyGyro.CFrame = CFrame.new(Object.CFrame.Position)
 	BodyGyro.Parent = Object
 
 	local ToolPos = GetToolPosition()
@@ -115,6 +115,26 @@ local function GetMouseHitPosition()
 	return RaycastResult and RaycastResult.Position or Camera.CFrame.Position + Camera.CFrame.LookVector * 1000
 end
 
+local function RemoveSelectedData(SelectedDataIndex)
+	if not SelectedObjects[SelectedDataIndex] then return end
+
+	local Data = SelectedObjects[SelectedDataIndex]
+
+	if Data["SelectionBox"] then
+		Data["SelectionBox"]:Destroy()
+	end
+
+	if Data["BodyPosition"] then
+		Data["BodyPosition"]:Destroy()
+	end
+
+	if Data["BodyGyro"] then
+		Data["BodyGyro"]:Destroy()
+	end
+
+	table.remove(SelectedObjects, SelectedDataIndex)
+end
+
 UserInputService.InputBegan:Connect(function(Input, Processed)
 	if Processed then return end
 
@@ -130,10 +150,7 @@ UserInputService.InputBegan:Connect(function(Input, Processed)
 
 			local TargetData, Index = FindTarget(Target)
 			if TargetData then
-				TargetData["SelectionBox"]:Destroy()
-				TargetData["BodyPosition"]:Destroy()
-				TargetData["BodyGyro"]:Destroy()
-				table.remove(SelectedObjects, Index)
+				RemoveSelectedData(Index)
 			else
 				local SelectionBox, BodyPosition, BodyGyro, InitialDistance = SetupObject(Target)
 				if SelectionBox and BodyPosition and BodyGyro then
@@ -143,7 +160,7 @@ UserInputService.InputBegan:Connect(function(Input, Processed)
 						["BodyPosition"] = BodyPosition,
 						["BodyGyro"] = BodyGyro,
 						["Distance"] = InitialDistance,
-						["IsRotating"] = false
+						["IsStabilized"] = false
 					})
 				end
 			end
@@ -160,7 +177,7 @@ UserInputService.InputBegan:Connect(function(Input, Processed)
 		for _, Data in pairs(SelectedObjects) do
 			if Data["Object"] and Data["BodyPosition"] then
 				local ThrowDirection = Camera.CFrame.LookVector
-				Data["Object"].Velocity = ThrowDirection * 150
+				Data["Object"].Velocity = ThrowDirection * 250
 				Data["SelectionBox"]:Destroy()
 				Data["BodyPosition"]:Destroy()
 				Data["BodyGyro"]:Destroy()
@@ -173,8 +190,8 @@ UserInputService.InputBegan:Connect(function(Input, Processed)
 			if Data["BodyGyro"] then
 				Data["Object"].AssemblyLinearVelocity = Vector3.zero
 				Data["Object"].AssemblyAngularVelocity = Vector3.zero
-				Data["IsRotating"] = not Data["IsRotating"]
-				Data["BodyGyro"].MaxTorque = Data["IsRotating"] and 
+				Data["IsStabilized"] = not Data["IsStabilized"]
+				Data["BodyGyro"].MaxTorque = Data["IsStabilized"] and 
 					Vector3.new(math.huge, 0, math.huge) or Vector3.zero
 			end
 		end
@@ -407,16 +424,15 @@ Tool.Equipped:Connect(function()
 			CurrentSettings[SettingName] = ReplicatedStorage:GetAttribute(SettingName)
 		end
 	end
-	
+
 	ToolEquipped = true
-	
+
 	if Gui then
 		Gui:Destroy()
 		Gui = nil
 	end
 
 	Gui = CreateGui()
-	
 end)
 
 Tool.Unequipped:Connect(function()
@@ -424,18 +440,12 @@ Tool.Unequipped:Connect(function()
 		Gui:Destroy()
 		Gui = nil
 	end
-	
+
 	ToolEquipped = false
-	for _, Data in pairs(SelectedObjects) do
-		if Data["Object"] then
-			Data["SelectionBox"]:Destroy()
-			Data["BodyPosition"]:Destroy()
-			if Data["BodyGyro"] then
-				Data["BodyGyro"]:Destroy()
-			end
-		end
+	
+	for Index = #SelectedObjects, 1, -1 do
+		RemoveSelectedData(Index)
 	end
-	SelectedObjects = {}
 end)
 
 Tool.Destroying:Connect(function()
@@ -443,24 +453,14 @@ Tool.Destroying:Connect(function()
 		Gui:Destroy()
 		Gui = nil
 	end
-	
-	for _, Data in pairs(SelectedObjects) do
-		if Data["SelectionBox"] then
-			Data["SelectionBox"]:Destroy()
-		end
-		if Data["BodyPosition"] then
-			Data["BodyPosition"]:Destroy()
-		end
-		if Data["BodyGyro"] then
-			Data["BodyGyro"]:Destroy()
-		end
+
+	for Index = #SelectedObjects, 1, -1 do
+		RemoveSelectedData(Index)
 	end
-	
-	SelectedObjects = {}
 end)
 
 RunService.RenderStepped:Connect(function()
-	for _, Data in pairs(SelectedObjects) do
+	for Index , Data in pairs(SelectedObjects) do
 		if Data["Object"] and Data["BodyPosition"] then
 			local MouseHitPos = GetMouseHitPosition()
 			local ToolPosition = GetToolPosition()
@@ -472,20 +472,12 @@ RunService.RenderStepped:Connect(function()
 
 			Data["BodyPosition"].Position = TargetPosition
 			if Data["BodyGyro"] then
-				Data["BodyGyro"].CFrame = AimCFrame
+				Data["BodyGyro"].CFrame = CFrame.new(AimCFrame.Position)
 			end
 		end
+		
 		if not Data["Object"] then
-			if Data["SelectionBox"] then
-				Data["SelectionBox"]:Destroy()
-			end
-			if Data["BodyPosition"] then
-				Data["BodyPosition"]:Destroy()
-			end
-			if Data["BodyGyro"] then
-				Data["BodyGyro"]:Destroy()
-			end
-			table.remove(SelectedObjects, table.find(SelectedObjects, Data))
+			RemoveSelectedData(Index)
 		end
 	end
 end)
