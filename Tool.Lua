@@ -55,7 +55,7 @@ local function SetupObject(Object)
 
 	local BodyPosition = Instance.new("BodyPosition")
 	BodyPosition.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-	BodyPosition.P = 40000
+	BodyPosition.P = 15000
 	BodyPosition.D = 700
 	BodyPosition.Position = Object.Position
 	BodyPosition.Parent = Object
